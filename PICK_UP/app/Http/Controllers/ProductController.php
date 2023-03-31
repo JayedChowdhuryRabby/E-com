@@ -1,0 +1,235 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Product;
+use App\Http\Requests\StoreProductRequest;
+use App\Http\Requests\UpdateProductRequest;
+use Illuminate\Http\Request;
+use App\Models\Order;
+use App\Models\Orderdetail;
+use Illuminate\Support\Facades\Validator;
+use Intervention\Image\ImageManagerStatic as Image;
+class ProductController extends Controller
+{
+    /**
+     * Display a listing of the resource.
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function index()
+    {
+        //
+    }
+
+    /**
+     * Show the form for creating a new resource.
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function create()
+    {
+        //
+    }
+
+    /**
+     * Store a newly created resource in storage.
+     *
+     * @param  \App\Http\Requests\StoreProductRequest  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function store(StoreProductRequest $request)
+    {
+        //
+    }
+
+    /**
+     * Display the specified resource.
+     *
+     * @param  \App\Models\Product  $product
+     * @return \Illuminate\Http\Response
+     */
+    public function show(Product $product)
+    {
+        //
+    }
+
+    /**
+     * Show the form for editing the specified resource.
+     *
+     * @param  \App\Models\Product  $product
+     * @return \Illuminate\Http\Response
+     */
+    public function edit(Product $product)
+    {
+        //
+    }
+
+    /**
+     * Update the specified resource in storage.
+     *
+     * @param  \App\Http\Requests\UpdateProductRequest  $request
+     * @param  \App\Models\Product  $product
+     * @return \Illuminate\Http\Response
+     */
+    public function update(UpdateProductRequest $request, Product $product)
+    {
+        //
+    }
+
+    /**
+     * Remove the specified resource from storage.
+     *
+     * @param  \App\Models\Product  $product
+     * @return \Illuminate\Http\Response
+     */
+    public function destroy(Product $product)
+    {
+        //
+    }
+    public function list(){
+
+        $products = Product::all();
+        return view('product.list')->with('products',$products);
+
+    }
+    public function addtocart(Request $req){
+        $id = $req->id;
+        $p = Product::where('id',$id)->first();
+        $cart=[];
+        //$jsonCart = $req->session()->get('cart'); to get session value
+        //session()->get('cart')
+        if(session()->has('cart')){
+            $cart = json_decode(session()->get('cart'));
+        }
+        $product = array('id'=>$id,'qty'=>1,'name'=>$p->name,'price'=>$p->price,'image'=>$p->image);
+        $cart[] = (object)($product);
+        $jsonCart = json_encode($cart);
+        session()->put('cart',$jsonCart);
+        // return session()->get('cart');
+        return redirect()->route('products.list');
+    }
+    public function emptycart(){
+        session()->forget('cart');
+        if(!session()->has('cart')){
+            return redirect()->route('products.mycart');
+        }
+        return session('cart');
+
+    }
+    public function mycart(){
+        $cart = json_decode(session()->get('cart'));
+        return view('customer.cart')
+        ->with('cart',$cart);
+    }
+    public function checkout(Request $req){
+        //let when logged in there will be a field in session
+        $products = json_decode(session()->get('cart'));
+        //creating order
+        $customer_id= session()->get('user');
+        $name= session()->get('userName');
+        $order = new Order();
+        $order->customer_id =$customer_id;
+        $order->name=$name;
+        $order->status="Ordered";
+        $order->price = $req->total_price;
+        $order->save();
+
+        //creating order details
+        foreach($products as $p){
+            $o_d = new OrderDetail();
+            $o_d->order_id = $order->id;
+            $o_d->product_id = $p->id;
+            $o_d->quantity = $p->qty;
+            $o_d->unit_price = $p->price;
+            $o_d->image= $p->image;
+            $o_d->name= $p->name;
+            $o_d->save();
+        }
+
+        session()->forget('cart');
+
+        return "Pruchase Done!";
+
+
+    }
+
+    public function addProduct(){
+        return view('product.addProduct');
+    }
+
+    public function addProductSubmit(Request $request){
+        $request->validate([
+            'image' => 'required|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
+        ]);
+
+        $p = new Product();
+        $p->name=$request->name;
+        $p->price=$request->price;
+
+        if($request->hasFile('image')){
+            $imageName = time()."_".$request->file('image')->getClientOriginalName();
+
+            $request->image->move(public_path('images'), $imageName);
+            $p->image=$imageName;
+            $p->save();
+            return redirect(route('products.list'));
+        }
+
+        /* Store $imageName name in DATABASE from HERE */
+        return "No file";
+    }
+    public function productdelete(Request $request){
+        $product = Product::where('price', $request->price)->first();
+        $product->delete();
+
+        return redirect()->route('products.list');
+    }
+
+
+    public function product(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            "name"=>"required|min:5|max:30",
+            'price'=>'required',
+            //'image' => 'required|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
+            'image'=>'required',
+    
+
+        ]);
+        if ($validator->fails())
+        {
+            return response()->json([
+                'validation_errors'=>$validator->messages(),
+
+            ]);
+        }
+        else
+        {
+           $po= new Product;
+           $po->name=$request->input('name');
+           $po->price=$request->input('price');
+           $po->image=$request->input('image');
+           //$po->image=$request->file('image')->store('image');
+           $po->save();
+           return $po;
+         
+
+        }
+    }
+
+    public function ProductList(){
+
+        $products = Product::all();
+        return response()->json([
+            'status'=>200,
+            'products'=>$products
+        ]);
+      
+    }
+
+
+
+    
+    
+}
